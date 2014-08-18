@@ -128,13 +128,16 @@ git_ = command1_ "git" []
 darcs_ :: Text -> [Text] -> Sh ()
 darcs_ = command1_ "darcs" []
 
+curTagPlaceholder :: Text
+curTagPlaceholder = "%CURRENT%"
+
 readPackages :: Bool ->  FilePath -> Sh PackageSources
 readPackages allowCabals startDir = do
   fullDir <- canonic startDir
   chdir fullDir $ do
     cabalPresent <- if allowCabals then return False else isCabalPresent
     if cabalPresent then return mempty else do
-        psources <- getSources
+        psources <- getSources =<< getCurTag
         when (psources == mempty) $ terror $ "empty " <> toTextIgnore source_file
 
         let remote_pkgs = gitPackages psources ++ darcsen psources
@@ -163,6 +166,11 @@ readPackages allowCabals startDir = do
   where
     isCabalFile = flip hasExtension "cabal"
     isCabalPresent = fmap (any isCabalFile) (ls ".")
+    getCurTag = (`catchany_sh` (const $ return Nothing)) $ do
+      out <- run "git" ["rev-parse", "--abbrev-ref", "HEAD"]
+      return $ case T.lines out of
+        (ct:_) -> Just ct
+        _      -> Nothing
     updatePackage :: UnstablePackage -> Sh ()
     updatePackage p@(GitPackage repo _ t) = do
       let d = diskPath p
@@ -186,10 +194,10 @@ readPackages allowCabals startDir = do
         else chdir d $ darcs_ "pull"  ["--all"]
     updatePackage (Directory _ _) = return mempty
 
-    getSources :: Sh PackageSources
-    getSources = do
+    getSources :: Maybe Text -> Sh PackageSources
+    getSources curTag = do
         sourceContent <- readfile source_file
-        let sources = paritionSources [ source | 
+        let sources = paritionSources [ source |
               source <- map (T.words . T.strip) (T.lines sourceContent),
               not . null $ source,
               "--" /= head source
@@ -220,7 +228,7 @@ readPackages allowCabals startDir = do
               next s2  = go s2 more
               mkDir = Directory (fromText name) flgs
               mkPkg = Package name flgs
-              mkGit = GitPackage name realFlags tag
+              mkGit = GitPackage name realFlags (expandTag <$> tag)
               mkDarcs =
                 case T.stripPrefix "darcs:" name of
                   Nothing       -> error $ unpack $ "did not understand" <> T.intercalate " " (asList (Package name flgs))
@@ -229,3 +237,4 @@ readPackages allowCabals startDir = do
                 if length tags > 1
                   then error $ unpack $ "did not understand" <> T.intercalate " " (asList (Package name flgs))
                   else (rf, listToMaybe tags)
+              expandTag = maybe id (T.replace curTagPlaceholder) curTag
