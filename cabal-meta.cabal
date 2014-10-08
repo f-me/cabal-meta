@@ -1,5 +1,5 @@
 name:            cabal-meta
-version:         0.4.1.2
+version:         0.5
 license:         BSD3
 license-file:    LICENSE
 author:          Greg Weber <greg@gregweber.info>
@@ -24,7 +24,7 @@ Library
     build-depends: shelly >= 1.0 && < 2
                  , text, system-filepath
                  -- , file-location
-    extensions: OverloadedStrings 
+    extensions: OverloadedStrings
     exposed-modules: CabalMeta
 
 executable cabal-meta
@@ -43,7 +43,7 @@ executable cabal-meta
 
     other-modules: OmniConfig
 
-    extensions: OverloadedStrings 
+    extensions: OverloadedStrings
 
 test-suite test
   main-is:         test/main.hs
@@ -59,4 +59,3 @@ test-suite test
 source-repository head
   type:     git
   location: https://github.com/yesodweb/cabal-meta
-  
